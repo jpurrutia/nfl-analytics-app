@@ -6,8 +6,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     
     // Use backend API directly from server-side
-    // Use localhost when running outside Docker
-    const apiUrl = process.env.BACKEND_URL || 'http://localhost:8080/api'
+    // When running in Docker, use the backend service name
+    const apiUrl = process.env.BACKEND_URL || 'http://backend:8080/api'
     
     const response = await fetch(`${apiUrl}/auth/register`, {
       method: 'POST',

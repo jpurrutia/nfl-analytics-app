@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/contexts/AuthContext';
 import { Trophy, User, Mail, Lock, ArrowRight, UserPlus } from 'lucide-react';
+import PasswordStrengthIndicator from '@/components/PasswordStrengthIndicator';
+import { validatePassword } from '@/lib/password-validation';
 
 interface RegisterFormData {
   firstName: string;
@@ -24,18 +26,37 @@ export default function RegisterPage() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<RegisterFormData>();
 
   const password = watch('password');
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   const onSubmit = async (data: RegisterFormData) => {
+    // Validate password strength
+    const passwordValidation = validatePassword(data.password);
+    if (!passwordValidation.isValid) {
+      setPasswordError(passwordValidation.errors[0]);
+      return;
+    }
+    
+    // Check passwords match
+    if (data.password !== data.confirmPassword) {
+      return;
+    }
+    
     try {
       setIsLoading(true);
+      setPasswordError(null);
       await registerUser(data.firstName, data.lastName, data.email, data.password);
       router.push('/dashboard');
-    } catch (error) {
-      // Error is already handled in auth store
+    } catch (error: any) {
+      // Check if it's a password validation error from backend
+      if (error?.response?.data?.error?.includes('password')) {
+        setPasswordError(error.response.data.error);
+      }
+      // Other errors are handled in auth store
     } finally {
       setIsLoading(false);
     }
@@ -271,124 +292,32 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* Password Field */}
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '8px'
-            }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Lock style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '18px',
-                height: '18px',
-                color: '#9ca3af'
-              }} />
-              <input
-                {...register('password', {
-                  required: 'Password is required',
-                  minLength: {
-                    value: 8,
-                    message: 'Password must be at least 8 characters',
-                  },
-                })}
-                type="password"
-                style={{
-                  width: '100%',
-                  paddingLeft: '40px',
-                  paddingRight: '12px',
-                  paddingTop: '10px',
-                  paddingBottom: '10px',
-                  fontSize: '14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  transition: 'all 0.2s'
-                }}
-                placeholder="At least 8 characters"
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#10b981';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-            {errors.password && (
-              <p style={{
-                marginTop: '4px',
-                fontSize: '12px',
-                color: '#ef4444'
-              }}>{errors.password.message}</p>
-            )}
-          </div>
-
-          {/* Confirm Password Field */}
+          {/* Password Fields with Strength Indicator */}
           <div style={{ marginBottom: '24px' }}>
-            <label style={{
-              display: 'block',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#374151',
-              marginBottom: '8px'
-            }}>
-              Confirm Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Lock style={{
-                position: 'absolute',
-                left: '12px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                width: '18px',
-                height: '18px',
-                color: '#9ca3af'
-              }} />
-              <input
-                {...register('confirmPassword', {
-                  required: 'Please confirm your password',
-                  validate: value => value === password || 'Passwords do not match',
-                })}
-                type="password"
-                style={{
-                  width: '100%',
-                  paddingLeft: '40px',
-                  paddingRight: '12px',
-                  paddingTop: '10px',
-                  paddingBottom: '10px',
-                  fontSize: '14px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  transition: 'all 0.2s'
-                }}
-                placeholder="Confirm your password"
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = '#10b981';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-              />
-            </div>
-            {errors.confirmPassword && (
+            <PasswordStrengthIndicator
+              password={password || ''}
+              confirmPassword={watch('confirmPassword') || ''}
+              onPasswordChange={(value) => {
+                setValue('password', value);
+                setPasswordError(null);
+              }}
+              onConfirmPasswordChange={(value) => setValue('confirmPassword', value)}
+              showRequirements={true}
+              showStrengthBar={true}
+              showToggleVisibility={true}
+            />
+            {passwordError && (
               <p style={{
-                marginTop: '4px',
+                marginTop: '8px',
                 fontSize: '12px',
-                color: '#ef4444'
-              }}>{errors.confirmPassword.message}</p>
+                color: '#ef4444',
+                padding: '8px',
+                backgroundColor: '#fee2e2',
+                borderRadius: '6px',
+                border: '1px solid #fecaca'
+              }}>
+                {passwordError}
+              </p>
             )}
           </div>
 

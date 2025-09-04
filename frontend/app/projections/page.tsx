@@ -30,10 +30,14 @@ export default function ProjectionsPage() {
   const loadProjections = async () => {
     setLoading(true);
     try {
+      console.log('Loading projections for week:', selectedWeek);
       const data = await projections.getWeekly(selectedWeek, 2025, 500);
+      console.log('Received projections data:', data);
       setProjectionsData(data.projections);
     } catch (error) {
       console.error('Failed to load projections:', error);
+      // Show error to user
+      setProjectionsData([]);
     } finally {
       setLoading(false);
     }
@@ -67,6 +71,9 @@ export default function ProjectionsPage() {
     }
   };
 
+  console.log('Current projectionsData:', projectionsData);
+  console.log('Current filters:', { selectedPosition, searchTerm, sortBy });
+  
   const filteredAndSortedProjections = projectionsData
     .filter(p => {
       const matchesSearch = p.player_name.toLowerCase().includes(searchTerm.toLowerCase());
