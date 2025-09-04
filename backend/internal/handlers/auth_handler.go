@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -42,8 +43,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		case services.ErrEmailExists:
 			c.JSON(http.StatusConflict, gin.H{"error": "email already registered"})
 		default:
-			if err.Error() == "password does not meet requirements" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			// Check if it's a password validation error
+			errMsg := err.Error()
+			if strings.Contains(errMsg, "password") {
+				c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
 			} else {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "registration failed"})
 			}

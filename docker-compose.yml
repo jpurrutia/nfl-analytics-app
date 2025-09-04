@@ -79,7 +79,8 @@ services:
       target: development
     container_name: nfl_frontend
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - BACKEND_URL=http://backend:8080/api
       - NODE_ENV=development
     ports:
       - "3000:3000"
