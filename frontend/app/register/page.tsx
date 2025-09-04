@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/contexts/AuthContext';
+import { Trophy, User, Mail, Lock, ArrowRight, UserPlus } from 'lucide-react';
 
 interface RegisterFormData {
   firstName: string;
@@ -41,73 +42,193 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Create your account
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      padding: '20px'
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '480px',
+        backgroundColor: 'white',
+        borderRadius: '16px',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        overflow: 'hidden'
+      }}>
+        {/* Header */}
+        <div style={{
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          padding: '40px 32px',
+          textAlign: 'center'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            marginBottom: '16px'
+          }}>
+            <UserPlus style={{ width: '48px', height: '48px', color: 'white' }} />
+          </div>
+          <h2 style={{
+            fontSize: '28px',
+            fontWeight: '700',
+            color: 'white',
+            marginBottom: '8px'
+          }}>
+            Join NFL Analytics
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Or{' '}
-            <Link
-              href="/login"
-              className="font-medium text-indigo-600 hover:text-indigo-500"
-            >
-              sign in to existing account
-            </Link>
+          <p style={{
+            fontSize: '14px',
+            color: 'rgba(255,255,255,0.9)'
+          }}>
+            Create your account and start winning
           </p>
         </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+
+        {/* Form */}
+        <form onSubmit={handleSubmit(onSubmit)} style={{ padding: '32px' }}>
+          {/* Name Fields Row */}
+          <div style={{ display: 'flex', gap: '16px', marginBottom: '20px' }}>
+            {/* First Name */}
+            <div style={{ flex: 1 }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px'
+              }}>
                 First Name
               </label>
-              <input
-                {...register('firstName', {
-                  required: 'First name is required',
-                  minLength: {
-                    value: 2,
-                    message: 'First name must be at least 2 characters',
-                  },
-                })}
-                type="text"
-                autoComplete="given-name"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your first name"
-              />
+              <div style={{ position: 'relative' }}>
+                <User style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  color: '#9ca3af'
+                }} />
+                <input
+                  {...register('firstName', {
+                    required: 'First name is required',
+                  })}
+                  type="text"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '40px',
+                    paddingRight: '12px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    fontSize: '14px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  placeholder="John"
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#10b981';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
               {errors.firstName && (
-                <p className="mt-1 text-sm text-red-600">{errors.firstName.message}</p>
+                <p style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: '#ef4444'
+                }}>{errors.firstName.message}</p>
               )}
             </div>
 
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+            {/* Last Name */}
+            <div style={{ flex: 1 }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px'
+              }}>
                 Last Name
               </label>
-              <input
-                {...register('lastName', {
-                  required: 'Last name is required',
-                  minLength: {
-                    value: 2,
-                    message: 'Last name must be at least 2 characters',
-                  },
-                })}
-                type="text"
-                autoComplete="family-name"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your last name"
-              />
+              <div style={{ position: 'relative' }}>
+                <User style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: '18px',
+                  height: '18px',
+                  color: '#9ca3af'
+                }} />
+                <input
+                  {...register('lastName', {
+                    required: 'Last name is required',
+                  })}
+                  type="text"
+                  style={{
+                    width: '100%',
+                    paddingLeft: '40px',
+                    paddingRight: '12px',
+                    paddingTop: '10px',
+                    paddingBottom: '10px',
+                    fontSize: '14px',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: '8px',
+                    outline: 'none',
+                    transition: 'all 0.2s'
+                  }}
+                  placeholder="Doe"
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#10b981';
+                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.boxShadow = 'none';
+                  }}
+                />
+              </div>
               {errors.lastName && (
-                <p className="mt-1 text-sm text-red-600">{errors.lastName.message}</p>
+                <p style={{
+                  marginTop: '4px',
+                  fontSize: '12px',
+                  color: '#ef4444'
+                }}>{errors.lastName.message}</p>
               )}
             </div>
+          </div>
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
+          {/* Email Field */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Email Address
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Mail style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '18px',
+                height: '18px',
+                color: '#9ca3af'
+              }} />
               <input
                 {...register('email', {
                   required: 'Email is required',
@@ -118,18 +239,59 @@ export default function RegisterPage() {
                 })}
                 type="email"
                 autoComplete="email"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Enter your email"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '12px',
+                  paddingTop: '10px',
+                  paddingBottom: '10px',
+                  fontSize: '14px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                placeholder="john.doe@example.com"
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#10b981';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
-              )}
             </div>
+            {errors.email && (
+              <p style={{
+                marginTop: '4px',
+                fontSize: '12px',
+                color: '#ef4444'
+              }}>{errors.email.message}</p>
+            )}
+          </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
+          {/* Password Field */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Lock style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '18px',
+                height: '18px',
+                color: '#9ca3af'
+              }} />
               <input
                 {...register('password', {
                   required: 'Password is required',
@@ -137,60 +299,154 @@ export default function RegisterPage() {
                     value: 8,
                     message: 'Password must be at least 8 characters',
                   },
-                  pattern: {
-                    value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-                    message: 'Password must contain uppercase, lowercase, and number',
-                  },
                 })}
                 type="password"
-                autoComplete="new-password"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Create a password"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '12px',
+                  paddingTop: '10px',
+                  paddingBottom: '10px',
+                  fontSize: '14px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
+                placeholder="At least 8 characters"
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#10b981';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password.message}</p>
-              )}
             </div>
+            {errors.password && (
+              <p style={{
+                marginTop: '4px',
+                fontSize: '12px',
+                color: '#ef4444'
+              }}>{errors.password.message}</p>
+            )}
+          </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
-              </label>
+          {/* Confirm Password Field */}
+          <div style={{ marginBottom: '24px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '500',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Confirm Password
+            </label>
+            <div style={{ position: 'relative' }}>
+              <Lock style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '18px',
+                height: '18px',
+                color: '#9ca3af'
+              }} />
               <input
                 {...register('confirmPassword', {
                   required: 'Please confirm your password',
-                  validate: (value) => value === password || 'Passwords do not match',
+                  validate: value => value === password || 'Passwords do not match',
                 })}
                 type="password"
-                autoComplete="new-password"
-                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                style={{
+                  width: '100%',
+                  paddingLeft: '40px',
+                  paddingRight: '12px',
+                  paddingTop: '10px',
+                  paddingBottom: '10px',
+                  fontSize: '14px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'all 0.2s'
+                }}
                 placeholder="Confirm your password"
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = '#10b981';
+                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16, 185, 129, 0.1)';
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
               />
-              {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword.message}</p>
-              )}
             </div>
+            {errors.confirmPassword && (
+              <p style={{
+                marginTop: '4px',
+                fontSize: '12px',
+                color: '#ef4444'
+              }}>{errors.confirmPassword.message}</p>
+            )}
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? 'Creating account...' : 'Create account'}
-            </button>
-          </div>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            style={{
+              width: '100%',
+              padding: '12px 24px',
+              background: isLoading ? '#9ca3af' : 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px 0 rgba(16, 185, 129, 0.3)',
+              transition: 'transform 0.2s',
+              marginBottom: '24px'
+            }}
+            onMouseEnter={(e) => !isLoading && (e.currentTarget.style.transform = 'translateY(-2px)')}
+            onMouseLeave={(e) => !isLoading && (e.currentTarget.style.transform = 'translateY(0)')}
+          >
+            {isLoading ? 'Creating Account...' : (
+              <>
+                Create Account
+                <ArrowRight style={{ width: '20px', height: '20px' }} />
+              </>
+            )}
+          </button>
 
-          <div className="text-xs text-gray-600 text-center">
-            By registering, you agree to our{' '}
-            <a href="#" className="text-indigo-600 hover:text-indigo-500">
-              Terms of Service
-            </a>{' '}
-            and{' '}
-            <a href="#" className="text-indigo-600 hover:text-indigo-500">
-              Privacy Policy
-            </a>
+          {/* Login Link */}
+          <div style={{
+            textAlign: 'center',
+            paddingTop: '24px',
+            borderTop: '1px solid #e5e7eb'
+          }}>
+            <p style={{
+              fontSize: '14px',
+              color: '#6b7280'
+            }}>
+              Already have an account?{' '}
+              <Link
+                href="/login"
+                style={{
+                  color: '#10b981',
+                  fontWeight: '600',
+                  textDecoration: 'none'
+                }}
+              >
+                Sign in here
+              </Link>
+            </p>
           </div>
         </form>
       </div>
