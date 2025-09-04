@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Routes that don't require authentication
-const publicRoutes = ['/', '/login', '/register', '/about'];
-
 // Routes that require authentication
 const protectedRoutes = ['/dashboard', '/players', '/draft', '/leagues'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
+  // Skip middleware for test page
+  if (pathname === '/test-auth') {
+    return NextResponse.next();
+  }
+  
   // Get the access token from cookies
   const accessToken = request.cookies.get('access_token');
   
   // Check if the current route is protected
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isPublicRoute = publicRoutes.includes(pathname);
   const isAuthRoute = pathname === '/login' || pathname === '/register';
   
   // If trying to access protected route without token, redirect to login

@@ -405,3 +405,4 @@ func (s *Service) removePlayer(availablePlayers []string, playerID string) []str
 	}
 	return result
 }
+

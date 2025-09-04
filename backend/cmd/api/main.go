@@ -12,6 +12,7 @@ import (
 	"github.com/nfl-analytics/backend/internal/auth"
 	"github.com/nfl-analytics/backend/internal/config"
 	"github.com/nfl-analytics/backend/internal/database"
+	"github.com/nfl-analytics/backend/internal/draft"
 	"github.com/nfl-analytics/backend/internal/handlers"
 	"github.com/nfl-analytics/backend/internal/repositories"
 	"github.com/nfl-analytics/backend/internal/services"
@@ -102,15 +103,16 @@ func main() {
 		log.Fatalf("Failed to initialize credentials service: %v", err)
 	}
 	
-	// Analytics service temporarily disabled
-	// TODO: Re-enable when DuckDB is available
+	// Initialize draft service
+	draftRepo := draft.NewPostgresRepository(db.DB)
+	draftService := draft.NewService(draftRepo, redisClient)
 
 	// Initialize handlers
 	healthHandler := handlers.NewHealthHandler(db, redisClient)
 	authHandler := handlers.NewAuthHandler(authService)
 	userHandler := handlers.NewUserHandler(userService)
 	leagueHandler := handlers.NewLeagueHandler(credentialsService)
-	// analyticsHandler := handlers.NewAnalyticsHandler(metricsService)
+	draftHandler := handlers.NewDraftHandler(draftService)
 
 	// Create Gin router
 	r := gin.Default()
@@ -157,9 +159,18 @@ func main() {
 			leagueRoutes.PUT("/espn/update", leagueHandler.UpdateESPNCredentials)
 		}
 		
-		// Analytics endpoints (if available)
-		// Analytics routes temporarily disabled
-		// TODO: Re-enable when analytics service is available
+		// Draft endpoints
+		draftRoutes := api.Group("/draft")
+		{
+			draftRoutes.POST("/sessions", draftHandler.CreateSession)
+			draftRoutes.GET("/sessions", draftHandler.GetUserSessions)
+			draftRoutes.GET("/sessions/:id", draftHandler.GetSession)
+			draftRoutes.POST("/sessions/:id/pick", draftHandler.RecordPick)
+			draftRoutes.POST("/sessions/:id/undo", draftHandler.UndoPick)
+			draftRoutes.POST("/sessions/:id/redo", draftHandler.RedoPick)
+			draftRoutes.POST("/sessions/:id/pause", draftHandler.PauseSession)
+			draftRoutes.POST("/sessions/:id/resume", draftHandler.ResumeSession)
+		}
 	}
 
 	// Get port from config or environment

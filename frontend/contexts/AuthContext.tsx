@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -37,8 +37,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Skip redirect logic for test page
+    if (pathname === '/test-auth') {
+      return;
+    }
+    
     // Redirect logic based on authentication status
-    if (!isLoading) {
+    if (!isLoading && pathname) {
       const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
       
       if (!isAuthenticated && !isPublicRoute) {

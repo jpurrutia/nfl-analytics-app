@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/nfl-analytics/backend/internal/draft"
 )
 
@@ -21,7 +22,20 @@ func NewDraftHandler(draftService *draft.Service) *DraftHandler {
 
 // CreateSession handles POST /api/draft/sessions
 func (h *DraftHandler) CreateSession(c *gin.Context) {
-	userID := c.GetString("user_id") // Set by auth middleware
+	// Get user ID from context (set by auth middleware)
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+	
+	userUUID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		return
+	}
+	
+	userID := userUUID.String()
 
 	var req draft.CreateSessionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -40,7 +54,18 @@ func (h *DraftHandler) CreateSession(c *gin.Context) {
 
 // GetSession handles GET /api/draft/sessions/:id
 func (h *DraftHandler) GetSession(c *gin.Context) {
-	userID := c.GetString("user_id")
+	// Get user ID from context
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+	userUUID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		return
+	}
+	userID := userUUID.String()
 	sessionID := c.Param("id")
 
 	session, err := h.draftService.GetSession(c.Request.Context(), sessionID, userID)
@@ -58,7 +83,18 @@ func (h *DraftHandler) GetSession(c *gin.Context) {
 
 // GetUserSessions handles GET /api/draft/sessions
 func (h *DraftHandler) GetUserSessions(c *gin.Context) {
-	userID := c.GetString("user_id")
+	// Get user ID from context
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+	userUUID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		return
+	}
+	userID := userUUID.String()
 
 	sessions, err := h.draftService.GetUserSessions(c.Request.Context(), userID)
 	if err != nil {
@@ -74,7 +110,18 @@ func (h *DraftHandler) GetUserSessions(c *gin.Context) {
 
 // RecordPick handles POST /api/draft/sessions/:id/pick
 func (h *DraftHandler) RecordPick(c *gin.Context) {
-	userID := c.GetString("user_id")
+	// Get user ID from context
+	userIDValue, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not authenticated"})
+		return
+	}
+	userUUID, ok := userIDValue.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid user ID format"})
+		return
+	}
+	userID := userUUID.String()
 	sessionID := c.Param("id")
 
 	var req draft.RecordPickRequest
@@ -217,3 +264,4 @@ func (h *DraftHandler) RegisterRoutes(router *gin.RouterGroup) {
 		draft.POST("/sessions/:id/resume", h.ResumeSession)
 	}
 }
+

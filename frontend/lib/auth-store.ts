@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 
 interface User {
   id: string;
-  username: string;
   email: string;
+  first_name: string;
+  last_name: string;
   created_at: string;
 }
 
@@ -17,7 +18,7 @@ interface AuthState {
   
   // Actions
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -50,10 +51,15 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
-      register: async (username: string, email: string, password: string) => {
+      register: async (firstName: string, lastName: string, email: string, password: string) => {
         try {
           set({ isLoading: true });
-          const response = await auth.register({ username, email, password });
+          const response = await auth.register({ 
+            first_name: firstName, 
+            last_name: lastName, 
+            email, 
+            password 
+          });
           
           set({
             user: response.user,
@@ -86,7 +92,9 @@ export const useAuthStore = create<AuthState>()(
       checkAuth: async () => {
         // Check if we have an access token
         const token = getAccessToken();
+        
         if (!token) {
+          // No token, clear any persisted auth state
           set({
             user: null,
             isAuthenticated: false,
@@ -98,19 +106,27 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true });
           // Verify the token by fetching user profile
-          const response = await fetch('/api/users/profile', {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+          const response = await fetch('/api/auth/verify', {
+            method: 'GET',
           });
           
           if (response.ok) {
-            const userData = await response.json();
-            set({
-              user: userData,
-              isAuthenticated: true,
-              isLoading: false,
-            });
+            const data = await response.json();
+            
+            if (data.authenticated && data.user) {
+              set({
+                user: data.user,
+                isAuthenticated: true,
+                isLoading: false,
+              });
+            } else {
+              clearTokens();
+              set({
+                user: null,
+                isAuthenticated: false,
+                isLoading: false,
+              });
+            }
           } else {
             // Token is invalid
             clearTokens();

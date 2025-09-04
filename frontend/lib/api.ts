@@ -2,8 +2,8 @@ import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'ax
 import Cookies from 'js-cookie';
 import toast from 'react-hot-toast';
 
-// API base URL from environment variable
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+// API base URL - use relative for frontend API routes
+const API_BASE_URL = '/api';
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'access_token';
@@ -162,7 +162,7 @@ export const auth = {
     return response.data;
   },
   
-  register: async (data: { username: string; email: string; password: string }) => {
+  register: async (data: { first_name: string; last_name: string; email: string; password: string }) => {
     const response = await api.post('/auth/register', data);
     const { access_token, refresh_token } = response.data;
     setTokens(access_token, refresh_token);
