@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/redis/go-redis/v9"
 	"github.com/nfl-analytics/backend/internal/auth"
 	"github.com/nfl-analytics/backend/internal/config"
@@ -113,9 +114,20 @@ func main() {
 	userHandler := handlers.NewUserHandler(userService)
 	leagueHandler := handlers.NewLeagueHandler(credentialsService)
 	draftHandler := handlers.NewDraftHandler(draftService)
+	projectionsHandler := handlers.NewProjectionsHandler(db.DB)
 
 	// Create Gin router
 	r := gin.Default()
+	
+	// Configure CORS
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "http://localhost:3001"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 
 	// Public endpoints
 	r.GET("/health", healthHandler.Health)
@@ -125,6 +137,10 @@ func main() {
 			"version": "0.1.0",
 		})
 	})
+	
+	// Public projections endpoints (read-only, no auth required)
+	r.GET("/api/projections", projectionsHandler.GetProjections)
+	r.GET("/api/projections/player/:player", projectionsHandler.GetPlayerProjection)
 
 	// Auth endpoints (public)
 	authRoutes := r.Group("/api/auth")

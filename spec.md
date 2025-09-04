@@ -409,6 +409,13 @@ POST   /api/draft/import      - Import completed draft
   - psycopg2-binary for PostgreSQL
   - requests for API calls
 - **Scheduling**: Cron (later Airflow)
+- **Data Sources** (Production):
+  - BetOnline API for props and projections (primary source)
+  - Pinnacle API for betting lines and implied probabilities
+  - ESPN API for platform projections
+  - FantasyPros API for consensus data
+  - Note: Currently using test data from parquet files in tmp/ for development.
+         Production will implement proper API extractors for live data ingestion.
 
 #### Infrastructure
 - **Containerization**: Docker + Docker Compose
@@ -476,9 +483,12 @@ fantasy-football-analytics/
 ├── data-pipeline/
 │   ├── extractors/
 │   │   ├── nflverse.py
+│   │   ├── betonline.py         # Future: Live API extractor
+│   │   ├── pinnacle.py          # Future: Live API extractor
 │   │   ├── fantasypros.py
 │   │   └── espn.py
 │   ├── transformers/
+│   │   ├── consensus_aggregator.py  # Bronze → Silver → Gold pipeline
 │   │   ├── clean_plays.py
 │   │   ├── calculate_fantasy.py
 │   │   └── aggregate_stats.py
@@ -486,7 +496,7 @@ fantasy-football-analytics/
 │   │   └── postgres_loader.py
 │   ├── orchestration/
 │   │   └── daily_update.py
-│   ├── requirements.txt
+│   ├── pyproject.toml          # uv package management
 │   └── config.yaml
 │
 ├── docker/

@@ -1,4 +1,4 @@
-import { api } from './api'
+import api from './api'
 
 // Draft types matching backend models
 export interface DraftSession {

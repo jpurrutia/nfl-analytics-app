@@ -15,7 +15,8 @@ import {
   Bell,
   Search,
   ChevronRight,
-  LogOut
+  LogOut,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -29,6 +30,7 @@ export default function ModernLayout({ children }: ModernLayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+    { name: 'Projections', href: '/projections', icon: BarChart3 },
     { name: 'Players', href: '/players', icon: Users },
     { name: 'Draft', href: '/draft', icon: Trophy },
     { name: 'Leagues', href: '/leagues', icon: Shield },

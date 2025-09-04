@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import ModernLayout from '@/components/ModernLayout';
+import { projections, PlayerProjection } from '@/lib/backend-api';
 import { 
   Trophy, 
   Clock, 
@@ -28,6 +29,10 @@ interface Player {
   bye: number;
   drafted: boolean;
   draftedBy?: string;
+  confidence?: string;
+  floor?: number;
+  ceiling?: number;
+  sources?: number;
 }
 
 interface Team {
@@ -48,20 +53,39 @@ export default function DraftPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
 
-  // Initialize mock data
+  // Initialize data with real projections
   useEffect(() => {
-    const mockPlayers: Player[] = [
-      { id: '1', name: 'Christian McCaffrey', position: 'RB', team: 'SF', adp: 1.2, projected: 385, bye: 9, drafted: false },
-      { id: '2', name: 'Justin Jefferson', position: 'WR', team: 'MIN', adp: 2.1, projected: 358, bye: 13, drafted: false },
-      { id: '3', name: 'Ja\'Marr Chase', position: 'WR', team: 'CIN', adp: 3.5, projected: 342, bye: 7, drafted: false },
-      { id: '4', name: 'Tyreek Hill', position: 'WR', team: 'MIA', adp: 4.2, projected: 345, bye: 10, drafted: false },
-      { id: '5', name: 'Austin Ekeler', position: 'RB', team: 'LAC', adp: 5.8, projected: 315, bye: 5, drafted: false },
-      { id: '6', name: 'Stefon Diggs', position: 'WR', team: 'BUF', adp: 6.3, projected: 328, bye: 13, drafted: false },
-      { id: '7', name: 'Bijan Robinson', position: 'RB', team: 'ATL', adp: 7.1, projected: 305, bye: 11, drafted: false },
-      { id: '8', name: 'Travis Kelce', position: 'TE', team: 'KC', adp: 8.5, projected: 245, bye: 10, drafted: false },
-      { id: '9', name: 'Nick Chubb', position: 'RB', team: 'CLE', adp: 9.2, projected: 295, bye: 5, drafted: false },
-      { id: '10', name: 'Josh Allen', position: 'QB', team: 'BUF', adp: 10.8, projected: 412, bye: 13, drafted: false },
-    ];
+    const loadProjections = async () => {
+      try {
+        const data = await projections.getWeekly(1, 2025, 200);
+        
+        // Map projections to Player format
+        const players: Player[] = data.projections.map((proj, index) => ({
+          id: `player-${index}`,
+          name: proj.player_name,
+          position: proj.position || 'N/A',
+          team: proj.team || 'FA',
+          adp: index + 1, // Use ranking as ADP for now
+          projected: Math.round(proj.consensus_ppr),
+          bye: 9, // Default bye week
+          drafted: false,
+          confidence: proj.confidence_rating,
+          floor: Math.round(proj.floor_ppr),
+          ceiling: Math.round(proj.ceiling_ppr),
+          sources: proj.num_sources
+        }));
+        
+        setAvailablePlayers(players);
+      } catch (error) {
+        console.error('Failed to load projections:', error);
+        // Fall back to mock data if API fails
+        const mockPlayers: Player[] = [
+          { id: '1', name: 'Christian McCaffrey', position: 'RB', team: 'SF', adp: 1.2, projected: 385, bye: 9, drafted: false },
+          { id: '2', name: 'Justin Jefferson', position: 'WR', team: 'MIN', adp: 2.1, projected: 358, bye: 13, drafted: false },
+        ];
+        setAvailablePlayers(mockPlayers);
+      }
+    };
 
     const mockTeams: Team[] = Array.from({ length: 10 }, (_, i) => ({
       id: `team-${i + 1}`,
@@ -71,7 +95,7 @@ export default function DraftPage() {
       picks: []
     }));
 
-    setAvailablePlayers(mockPlayers);
+    loadProjections();
     setTeams(mockTeams);
   }, []);
 
@@ -350,8 +374,33 @@ export default function DraftPage() {
                         <p style={{ fontSize: '14px', fontWeight: '600', color: '#111827' }}>{player.adp}</p>
                       </div>
                     </div>
-                    <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: '12px', color: '#6b7280' }}>Projected: {player.projected} pts</span>
+                    <div style={{ marginTop: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <span style={{ fontSize: '12px', color: '#6b7280' }}>
+                            {player.projected} pts
+                          </span>
+                          {player.floor && player.ceiling && (
+                            <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: '4px' }}>
+                              ({player.floor}-{player.ceiling})
+                            </span>
+                          )}
+                        </div>
+                        {player.confidence && (
+                          <span style={{
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '600',
+                            backgroundColor: player.confidence === 'HIGH' ? '#10b98115' : 
+                                           player.confidence === 'MEDIUM' ? '#f5970b15' : '#ef444415',
+                            color: player.confidence === 'HIGH' ? '#10b981' : 
+                                  player.confidence === 'MEDIUM' ? '#f59e0b' : '#ef4444'
+                          }}>
+                            {player.confidence}
+                          </span>
+                        )}
+                      </div>
                       {isMyTurn && selectedPlayer?.id === player.id && (
                         <button
                           onClick={(e) => {
@@ -359,7 +408,9 @@ export default function DraftPage() {
                             handleDraftPlayer(player);
                           }}
                           style={{
-                            padding: '4px 12px',
+                            marginTop: '8px',
+                            width: '100%',
+                            padding: '6px 12px',
                             backgroundColor: '#3b82f6',
                             color: 'white',
                             border: 'none',
@@ -369,7 +420,7 @@ export default function DraftPage() {
                             cursor: 'pointer'
                           }}
                         >
-                          Draft
+                          Draft Player
                         </button>
                       )}
                     </div>
