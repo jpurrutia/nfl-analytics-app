@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -84,16 +85,13 @@ func (s *authService) Register(ctx context.Context, req *models.RegisterRequest)
 		UpdatedAt:    time.Now(),
 	}
 	
-	// Use the Create method from user repository
-	if repo, ok := s.userRepo.(*repositories.PostgresUserRepository); ok {
-		if err := repo.Create(ctx, user); err != nil {
-			if err == repositories.ErrUserExists {
-				return nil, ErrEmailExists
-			}
-			return nil, err
+	// Create user in repository
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		if err == repositories.ErrUserExists {
+			return nil, ErrEmailExists
 		}
-	} else {
-		return nil, errors.New("repository does not support user creation")
+		// Add context to the error for debugging
+		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 	
 	// Generate tokens

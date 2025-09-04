@@ -33,6 +33,14 @@ A comprehensive, data-driven fantasy football analytics platform that provides p
    - Position scarcity calculations
    - Mean reversion pattern detection
    - QB stability analysis
+   - **Advanced Projection System** (NEW):
+     - Sharp sportsbook data (BetOnline, Pinnacle) for true point estimates
+     - Fantasy platform projections (ESPN, FantasyPros) for consensus
+     - Floor/ceiling calculations from alternate betting lines
+     - Imputation strategy: Use fantasy projections when props unavailable
+     - League-specific adjustments based on scoring settings
+     - Start/sit decisions based on projection confidence
+     - FA/Waiver recommendations (Tuesday props release timing)
 
 4. **User Management**
    - Full user accounts with email/password authentication
@@ -104,7 +112,8 @@ A comprehensive, data-driven fantasy football analytics platform that provides p
 │           Python Data Pipeline               │
 │         (Cron Jobs → Airflow later)          │
 │                                              │
-│  nflverse API | FantasyPros | ESPN API      │
+│  nflverse | ESPN API | Projections Sources  │
+│  (BetOnline, Pinnacle, FantasyPros, etc.)   │
 └──────────────────────────────────────────────┘
 ```
 
@@ -113,8 +122,12 @@ A comprehensive, data-driven fantasy football analytics platform that provides p
 #### Medallion Architecture
 1. **Bronze Layer** (Raw Data)
    - Raw play-by-play data from nflverse
-   - Unprocessed ADP values from FantasyPros
    - Raw ESPN API responses
+   - Projection data from multiple sources:
+     - BetOnline props and projections
+     - Pinnacle betting lines and implied probabilities
+     - FantasyPros consensus projections
+     - ESPN projections
    - Storage: PostgreSQL bronze schema tables
 
 2. **Silver Layer** (Cleaned Data)
@@ -190,6 +203,21 @@ CREATE SCHEMA silver;
 CREATE SCHEMA gold;
 
 -- Bronze: Raw data tables
+CREATE TABLE bronze.raw_projections (
+    source VARCHAR(50),  -- 'betonline', 'pinnacle', 'fantasypros', 'espn'
+    week INTEGER,
+    season INTEGER,
+    player_name VARCHAR(255),
+    position VARCHAR(10),
+    team VARCHAR(10),
+    stat_type VARCHAR(50),
+    stat_value DECIMAL(10,2),
+    implied_probability DECIMAL(5,4),
+    betting_line INTEGER,
+    timestamp TIMESTAMP,
+    ingested_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE bronze.raw_plays (
     game_id VARCHAR(20),
     play_id INTEGER,
@@ -236,8 +264,41 @@ CREATE TABLE gold.player_metrics (
     calculated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- Gold: Consensus projections with floor/ceiling
+CREATE TABLE gold.player_projections (
+    player_id VARCHAR(50),
+    player_name VARCHAR(255),
+    position VARCHAR(10),
+    team VARCHAR(10),
+    week INTEGER,
+    season INTEGER,
+    -- Consensus values
+    consensus_points DECIMAL(5,2),
+    floor_points DECIMAL(5,2),      -- From alternate unders
+    ceiling_points DECIMAL(5,2),    -- From alternate overs
+    -- Individual source projections
+    betonline_proj DECIMAL(5,2),
+    pinnacle_proj DECIMAL(5,2),
+    fantasypros_proj DECIMAL(5,2),
+    espn_proj DECIMAL(5,2),
+    -- Detailed stat projections (from BOL format)
+    proj_passing_yards DECIMAL(6,2),
+    proj_passing_tds DECIMAL(3,2),
+    proj_rushing_yards DECIMAL(5,2),
+    proj_rushing_tds DECIMAL(3,2),
+    proj_receiving_yards DECIMAL(5,2),
+    proj_receiving_tds DECIMAL(3,2),
+    proj_receptions DECIMAL(4,2),
+    -- Meta
+    projection_std_dev DECIMAL(5,2),
+    confidence_rating VARCHAR(10),  -- 'HIGH', 'MEDIUM', 'LOW'
+    has_props BOOLEAN,               -- Whether sportsbook props available
+    calculated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE INDEX idx_player_metrics_season ON gold.player_metrics(player_id, season);
 CREATE INDEX idx_player_week_stats ON silver.player_week_stats(player_id, season, week);
+CREATE INDEX idx_player_projections ON gold.player_projections(player_id, season, week);
 ```
 
 ### API Design
@@ -337,10 +398,15 @@ POST   /api/draft/import      - Import completed draft
 
 #### Data Pipeline
 - **Language**: Python 3.11+
+- **Package Manager**: uv (fast, reliable Python package management)
+  - All Python dependencies managed via `pyproject.toml`
+  - Virtual environments via `uv venv`
+  - No pip/pip3 usage - consistency across all environments
 - **Data Libraries**:
-  - pandas for data manipulation
+  - polars for high-performance data manipulation (replacing pandas)
+  - pandas for legacy compatibility where needed
   - nfl_data_py for nflverse access
-  - psycopg2 for PostgreSQL
+  - psycopg2-binary for PostgreSQL
   - requests for API calls
 - **Scheduling**: Cron (later Airflow)
 

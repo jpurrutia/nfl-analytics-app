@@ -249,15 +249,23 @@ Implement data extraction from nflverse using nfl_data_py.
 Create in data-pipeline/extractors/:
 1. base_extractor.py - Abstract base class for extractors
 2. nflverse_extractor.py - NFL play-by-play data extraction
-3. config.py - Data source configuration
+3. projections_extractor.py - Multi-source projections extraction
+4. config.py - Data source configuration
 
-The extractor should:
+The nflverse extractor should:
 - Download 5 seasons of play-by-play data
 - Handle rate limiting and retries
 - Store raw data in PostgreSQL bronze.raw_plays
 - Track extraction metadata (timestamps, record counts)
 - Support incremental updates
 - Use pre-calculated fantasy points from nflverse
+
+The projections extractor should:
+- Load projections from multiple sources (BetOnline, Pinnacle)
+- Standardize player names across sources
+- Handle different stat formats
+- Store in bronze.raw_projections
+- Support weekly updates
 
 Write tests:
 1. test_nflverse_extractor.py - Mock API responses
@@ -309,6 +317,45 @@ Create data-pipeline/orchestration/transform_data.py:
 - Handle partial failures gracefully
 
 All transformations happen in Python with PostgreSQL for storage only.
+```
+
+---
+
+### Prompt 8.5: Projections Aggregation Pipeline
+
+```text
+Implement projection aggregation from multiple sources.
+
+Create in data-pipeline/projections/:
+1. projection_aggregator.py - Combine projections from multiple sources
+2. name_mapper.py - Handle name variations across sources
+3. confidence_calculator.py - Calculate confidence ratings
+4. consensus_builder.py - Build consensus projections
+
+The aggregation should:
+- Read from bronze.raw_projections
+- Map player names to consistent IDs
+- Calculate consensus projections (mean, median, weighted avg)
+- Calculate standard deviation across sources
+- Assign confidence ratings based on agreement
+- Store in gold.player_projections
+
+Handle edge cases:
+- Missing projections from some sources
+- Name variations (Jr., Sr., III, etc.)
+- Position mismatches
+- Team changes mid-season
+
+Write tests:
+1. test_name_mapping.py - Name standardization
+2. test_consensus.py - Aggregation logic
+3. test_confidence.py - Confidence calculations
+4. Integration test with sample data
+
+Create data-pipeline/orchestration/aggregate_projections.py:
+- Weekly script to aggregate all projection sources
+- Generate consensus rankings
+- Calculate confidence intervals
 ```
 
 ---

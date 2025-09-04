@@ -2,11 +2,12 @@ package repositories
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"database/sql"
 	"github.com/nfl-analytics/backend/internal/database"
 	"github.com/nfl-analytics/backend/internal/models"
 )
@@ -21,6 +22,7 @@ var (
 type UserRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*models.User, error)
 	GetByEmail(ctx context.Context, email string) (*models.User, error)
+	Create(ctx context.Context, user *models.User) error
 	Update(ctx context.Context, user *models.User) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -179,9 +181,11 @@ func (r *PostgresUserRepository) Create(ctx context.Context, user *models.User) 
 	
 	if err != nil {
 		// Check for unique constraint violation
-		if err.Error() == "duplicate key value violates unique constraint" {
+		if strings.Contains(err.Error(), "duplicate key") || 
+		   strings.Contains(err.Error(), "users_email_key") {
 			return ErrUserExists
 		}
+		// Return the actual error for debugging
 		return err
 	}
 	
