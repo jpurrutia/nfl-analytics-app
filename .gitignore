@@ -1,0 +1,123 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Go
+backend/tmp/
+backend/vendor/
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+backend/*.test
+backend/*.out
+backend/go.work
+backend/air_errors.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+data-pipeline/build/
+data-pipeline/develop-eggs/
+data-pipeline/dist/
+data-pipeline/downloads/
+data-pipeline/eggs/
+data-pipeline/.eggs/
+data-pipeline/lib/
+data-pipeline/lib64/
+data-pipeline/parts/
+data-pipeline/sdist/
+data-pipeline/var/
+data-pipeline/wheels/
+data-pipeline/*.egg-info/
+data-pipeline/.installed.cfg
+data-pipeline/*.egg
+data-pipeline/MANIFEST
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+
+# Node.js / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.cache/
+frontend/build/
+frontend/dist/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+frontend/lerna-debug.log*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+postgres_data/
+redis_data/
+duckdb_data/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+log/
+
+# Testing
+coverage/
+.nyc_output/
+
+# OS Files
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Data files (but keep structure)
+data/
+!data/.gitkeep
+*.csv
+*.json
+*.parquet
+*.arrow
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SSL Certificates
+*.pem
+*.key
+*.crt
+*.cer
+
+# Secrets
+secrets/
+*.secret

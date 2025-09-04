@@ -1,0 +1,269 @@
+package handlers
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/nfl-analytics/backend/internal/integrations/espn"
+	"github.com/nfl-analytics/backend/internal/services"
+)
+
+// LeagueHandler handles league-related HTTP requests
+type LeagueHandler struct {
+	leagueService *services.LeagueService
+	espnClient    *espn.ESPNClient
+}
+
+// NewLeagueHandler creates a new league handler
+func NewLeagueHandler(leagueService *services.LeagueService, espnClient *espn.ESPNClient) *LeagueHandler {
+	return &LeagueHandler{
+		leagueService: leagueService,
+		espnClient:    espnClient,
+	}
+}
+
+// ConnectLeague handles POST /api/leagues
+func (h *LeagueHandler) ConnectLeague(c *gin.Context) {
+	userID := c.GetString("user_id") // Set by auth middleware
+	
+	var req struct {
+		LeagueID string `json:"league_id" binding:"required"`
+		Platform string `json:"platform" binding:"required"`
+		// ESPN Authentication for private leagues
+		SWID   string `json:"swid,omitempty"`   // ESPN SWID cookie value (without curly braces)
+		EspnS2 string `json:"espn_s2,omitempty"` // ESPN S2 cookie value
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	
+	// Validate platform
+	if req.Platform != "ESPN" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only ESPN platform is currently supported"})
+		return
+	}
+	
+	// Set authentication if provided (for private leagues)
+	if req.SWID != "" && req.EspnS2 != "" {
+		h.espnClient.SetAuthentication(req.SWID, req.EspnS2)
+	}
+	
+	// Fetch league info from ESPN
+	leagueInfo, err := h.espnClient.GetLeagueInfo(c.Request.Context(), req.LeagueID)
+	if err != nil {
+		// Check if it might be a private league issue
+		if req.SWID == "" || req.EspnS2 == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Failed to fetch league info. If this is a private league, please provide SWID and espn_s2 cookies.",
+				"instructions": "Follow the instructions in the documentation to obtain ESPN cookies from your browser.",
+			})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to fetch league info: " + err.Error()})
+		return
+	}
+	
+	// Save league to database
+	league, err := h.leagueService.CreateLeague(c.Request.Context(), userID, leagueInfo, req.Platform)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusCreated, league)
+}
+
+// GetLeague handles GET /api/leagues/:id
+func (h *LeagueHandler) GetLeague(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	
+	league, err := h.leagueService.GetLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, league)
+}
+
+// GetUserLeagues handles GET /api/leagues
+func (h *LeagueHandler) GetUserLeagues(c *gin.Context) {
+	userID := c.GetString("user_id")
+	
+	leagues, err := h.leagueService.GetUserLeagues(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"leagues": leagues,
+		"count":   len(leagues),
+	})
+}
+
+// SyncLeague handles POST /api/leagues/:id/sync
+func (h *LeagueHandler) SyncLeague(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	
+	// Verify user owns the league
+	league, err := h.leagueService.GetLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
+		return
+	}
+	
+	// Fetch latest data from ESPN
+	leagueInfo, err := h.espnClient.GetLeagueInfo(c.Request.Context(), league.ExternalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to sync: " + err.Error()})
+		return
+	}
+	
+	// Update league data
+	updated, err := h.leagueService.UpdateLeague(c.Request.Context(), leagueID, leagueInfo)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message": "League synced successfully",
+		"league":  updated,
+	})
+}
+
+// GetLeagueRosters handles GET /api/leagues/:id/rosters
+func (h *LeagueHandler) GetLeagueRosters(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	
+	// Verify user owns the league
+	league, err := h.leagueService.GetLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
+		return
+	}
+	
+	// Fetch rosters from ESPN
+	rosters, err := h.espnClient.GetRosters(c.Request.Context(), league.ExternalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to fetch rosters: " + err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"league_id": leagueID,
+		"rosters":   rosters,
+		"count":     len(rosters),
+	})
+}
+
+// GetAvailablePlayers handles GET /api/leagues/:id/available-players
+func (h *LeagueHandler) GetAvailablePlayers(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	
+	// Verify user owns the league
+	league, err := h.leagueService.GetLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
+		return
+	}
+	
+	// Fetch available players from ESPN
+	players, err := h.espnClient.GetAvailablePlayers(c.Request.Context(), league.ExternalID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to fetch players: " + err.Error()})
+		return
+	}
+	
+	// Apply filters if provided
+	position := c.Query("position")
+	if position != "" {
+		filtered := []espn.Player{}
+		for _, p := range players {
+			if p.Position == position {
+				filtered = append(filtered, p)
+			}
+		}
+		players = filtered
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"league_id": leagueID,
+		"players":   players,
+		"count":     len(players),
+	})
+}
+
+// DeleteLeague handles DELETE /api/leagues/:id
+func (h *LeagueHandler) DeleteLeague(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	
+	err := h.leagueService.DeleteLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found or unauthorized"})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"message": "League disconnected successfully",
+	})
+}
+
+// GetMatchups handles GET /api/leagues/:id/matchups
+func (h *LeagueHandler) GetMatchups(c *gin.Context) {
+	userID := c.GetString("user_id")
+	leagueID := c.Param("id")
+	weekStr := c.DefaultQuery("week", "0") // 0 = current week
+	
+	// Verify user owns the league
+	league, err := h.leagueService.GetLeague(c.Request.Context(), leagueID, userID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "League not found"})
+		return
+	}
+	
+	week := 0
+	if weekStr != "0" {
+		// Parse week number
+		// For now, we'll use the current week from the league status
+		// In production, you'd parse the weekStr to int
+		week = 0 // 0 means current week in ESPN API
+	}
+	
+	// Fetch matchups from ESPN
+	matchups, err := h.espnClient.GetMatchups(c.Request.Context(), league.ExternalID, week)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to fetch matchups: " + err.Error()})
+		return
+	}
+	
+	c.JSON(http.StatusOK, gin.H{
+		"league_id": leagueID,
+		"week":      week,
+		"matchups":  matchups,
+		"count":     len(matchups),
+	})
+}
+
+// RegisterRoutes registers all league routes
+func (h *LeagueHandler) RegisterRoutes(router *gin.RouterGroup) {
+	leagues := router.Group("/leagues")
+	{
+		leagues.POST("", h.ConnectLeague)
+		leagues.GET("", h.GetUserLeagues)
+		leagues.GET("/:id", h.GetLeague)
+		leagues.POST("/:id/sync", h.SyncLeague)
+		leagues.DELETE("/:id", h.DeleteLeague)
+		leagues.GET("/:id/rosters", h.GetLeagueRosters)
+		leagues.GET("/:id/available-players", h.GetAvailablePlayers)
+		leagues.GET("/:id/matchups", h.GetMatchups)
+	}
+}

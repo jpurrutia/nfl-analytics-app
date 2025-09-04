@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # PostgreSQL - Main transactional database
+  postgres:
+    image: postgres:15-alpine
+    container_name: nfl_postgres
+    environment:
+      POSTGRES_DB: fantasy_football
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: secure_password_change_me
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/internal/database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d fantasy_football"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nfl_network
+
+  # Redis - Caching layer
+  redis:
+    image: redis:7-alpine
+    container_name: nfl_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nfl_network
+
+  # Backend - Go API server
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+      target: development
+    container_name: nfl_backend
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=fantasy_football
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=secure_password_change_me
+      - POSTGRES_SSLMODE=disable
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=your_jwt_secret_change_me
+      - API_PORT=8080
+      - ENV=development
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app
+      - go_modules:/go/pkg/mod
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nfl_network
+
+  # Frontend - Next.js application
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+      target: development
+    container_name: nfl_frontend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8080/api
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - node_modules:/app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev
+    networks:
+      - nfl_network
+
+  # Data Pipeline - Python ETL
+  data-pipeline:
+    build:
+      context: ./data-pipeline
+      dockerfile: ../docker/pipeline.Dockerfile
+    container_name: nfl_pipeline
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=fantasy_football
+      - POSTGRES_USER=app_user
+      - POSTGRES_PASSWORD=secure_password_change_me
+      - DUCKDB_PATH=/data/analytics.db
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data-pipeline:/app
+      - duckdb_data:/data
+      - python_packages:/usr/local/lib/python3.11/site-packages
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nfl_network
+
+  # DuckDB - Analytics database (runs as part of data-pipeline container)
+  # Note: DuckDB is embedded, so it doesn't need its own service
+  # It will be accessed through the data-pipeline container
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  duckdb_data:
+    driver: local
+  go_modules:
+    driver: local
+  node_modules:
+    driver: local
+  python_packages:
+    driver: local
+
+networks:
+  nfl_network:
+    driver: bridge

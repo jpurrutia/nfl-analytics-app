@@ -1,0 +1,187 @@
+package services
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/nfl-analytics/backend/internal/integrations/espn"
+	"github.com/nfl-analytics/backend/internal/models"
+	"github.com/nfl-analytics/backend/internal/repositories"
+)
+
+// LeagueService handles business logic for fantasy leagues
+type LeagueService struct {
+	leagueRepo repositories.LeagueRepository
+}
+
+// NewLeagueService creates a new league service
+func NewLeagueService(leagueRepo repositories.LeagueRepository) *LeagueService {
+	return &LeagueService{
+		leagueRepo: leagueRepo,
+	}
+}
+
+// CreateLeague creates a new league connection for a user
+func (s *LeagueService) CreateLeague(ctx context.Context, userID string, leagueInfo *espn.LeagueInfo, platform string) (*models.League, error) {
+	// Check if league already exists for this user
+	existing, _ := s.leagueRepo.GetByExternalID(ctx, leagueInfo.ID, userID)
+	if existing != nil {
+		return nil, fmt.Errorf("league already connected")
+	}
+
+	// Convert ESPN settings to our format
+	settings := models.LeagueSettings{
+		ScoringType: s.detectScoringFormat(leagueInfo.Settings),
+		RosterSize: models.RosterRequirements{
+			QB:    leagueInfo.Settings.RosterSettings.QB,
+			RB:    leagueInfo.Settings.RosterSettings.RB,
+			WR:    leagueInfo.Settings.RosterSettings.WR,
+			TE:    leagueInfo.Settings.RosterSettings.TE,
+			FLEX:  leagueInfo.Settings.RosterSettings.FLEX,
+			DST:   leagueInfo.Settings.RosterSettings.DST,
+			K:     leagueInfo.Settings.RosterSettings.K,
+			Bench: leagueInfo.Settings.RosterSettings.BENCH,
+		},
+		PlayoffTeams:  leagueInfo.Settings.PlayoffSettings.PlayoffTeams,
+		PlayoffStart:  leagueInfo.Settings.PlayoffSettings.PlayoffStart,
+		CurrentWeek:   leagueInfo.Status.CurrentWeek,
+		TotalWeeks:    leagueInfo.Status.FinalMatchupPeriod,
+	}
+
+	// Store teams data
+	teamsData, _ := json.Marshal(leagueInfo.Teams)
+
+	league := &models.League{
+		ID:          uuid.New(),
+		UserID:      uuid.MustParse(userID),
+		Platform:    platform,
+		ExternalID:  leagueInfo.ID,
+		Name:        leagueInfo.Name,
+		Season:      leagueInfo.Season,
+		Settings:    settings,
+		TeamsData:   teamsData,
+		IsActive:    leagueInfo.Status.IsActive,
+		LastSyncAt:  sql.NullTime{Time: time.Now(), Valid: true},
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	// Save to database
+	if err := s.leagueRepo.Create(ctx, league); err != nil {
+		return nil, fmt.Errorf("failed to save league: %w", err)
+	}
+
+	return league, nil
+}
+
+// GetLeague retrieves a league by ID
+func (s *LeagueService) GetLeague(ctx context.Context, leagueID, userID string) (*models.League, error) {
+	league, err := s.leagueRepo.GetByID(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verify ownership
+	if league.UserID != userID {
+		return nil, fmt.Errorf("unauthorized")
+	}
+
+	return league, nil
+}
+
+// GetUserLeagues retrieves all leagues for a user
+func (s *LeagueService) GetUserLeagues(ctx context.Context, userID string) ([]*models.League, error) {
+	return s.leagueRepo.GetByUserID(ctx, userID)
+}
+
+// UpdateLeague updates league information
+func (s *LeagueService) UpdateLeague(ctx context.Context, leagueID string, leagueInfo *espn.LeagueInfo) (*models.League, error) {
+	league, err := s.leagueRepo.GetByID(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Update settings
+	league.Settings.CurrentWeek = leagueInfo.Status.CurrentWeek
+	league.IsActive = leagueInfo.Status.IsActive
+	league.LastSyncAt = time.Now()
+	league.UpdatedAt = time.Now()
+
+	// Update teams data
+	teamsData, _ := json.Marshal(leagueInfo.Teams)
+	league.TeamsData = string(teamsData)
+
+	// Save updates
+	if err := s.leagueRepo.Update(ctx, league); err != nil {
+		return nil, fmt.Errorf("failed to update league: %w", err)
+	}
+
+	return league, nil
+}
+
+// DeleteLeague removes a league connection
+func (s *LeagueService) DeleteLeague(ctx context.Context, leagueID, userID string) error {
+	league, err := s.GetLeague(ctx, leagueID, userID)
+	if err != nil {
+		return err
+	}
+
+	return s.leagueRepo.Delete(ctx, league.ID)
+}
+
+// detectScoringFormat determines the scoring format from ESPN settings
+func (s *LeagueService) detectScoringFormat(settings espn.LeagueSettings) string {
+	receptionPoints := settings.ScoringSettings.ReceptionPoints
+	
+	if receptionPoints == 1.0 {
+		return "PPR"
+	} else if receptionPoints == 0.5 {
+		return "HALF_PPR"
+	}
+	return "STANDARD"
+}
+
+// SyncAllLeagues performs batch sync for all active leagues
+func (s *LeagueService) SyncAllLeagues(ctx context.Context, espnClient *espn.ESPNClient) error {
+	leagues, err := s.leagueRepo.GetActiveLeagues(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active leagues: %w", err)
+	}
+
+	for _, league := range leagues {
+		// Fetch latest data from ESPN
+		leagueInfo, err := espnClient.GetLeagueInfo(ctx, league.ExternalID)
+		if err != nil {
+			// Log error but continue with other leagues
+			continue
+		}
+
+		// Update league
+		s.UpdateLeague(ctx, league.ID, leagueInfo)
+	}
+
+	return nil
+}
+
+// GetLeagueRosters fetches and caches roster data
+func (s *LeagueService) GetLeagueRosters(ctx context.Context, leagueID string, espnClient *espn.ESPNClient) ([]espn.Roster, error) {
+	league, err := s.leagueRepo.GetByID(ctx, leagueID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch from ESPN
+	rosters, err := espnClient.GetRosters(ctx, league.ExternalID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch rosters: %w", err)
+	}
+
+	// Optionally cache in database
+	// This could be stored in a separate rosters table
+
+	return rosters, nil
+}

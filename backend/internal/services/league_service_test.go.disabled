@@ -1,0 +1,287 @@
+package services
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/nfl-analytics/backend/internal/integrations/espn"
+	"github.com/nfl-analytics/backend/internal/models"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+// MockLeagueRepository is a mock implementation of LeagueRepository
+type MockLeagueRepository struct {
+	mock.Mock
+}
+
+func (m *MockLeagueRepository) Create(ctx context.Context, league *models.League) error {
+	args := m.Called(ctx, league)
+	return args.Error(0)
+}
+
+func (m *MockLeagueRepository) GetByID(ctx context.Context, id string) (*models.League, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.League), args.Error(1)
+}
+
+func (m *MockLeagueRepository) GetByUserID(ctx context.Context, userID string) ([]*models.League, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.League), args.Error(1)
+}
+
+func (m *MockLeagueRepository) GetByExternalID(ctx context.Context, externalID, userID string) (*models.League, error) {
+	args := m.Called(ctx, externalID, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*models.League), args.Error(1)
+}
+
+func (m *MockLeagueRepository) Update(ctx context.Context, league *models.League) error {
+	args := m.Called(ctx, league)
+	return args.Error(0)
+}
+
+func (m *MockLeagueRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockLeagueRepository) GetActiveLeagues(ctx context.Context) ([]*models.League, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*models.League), args.Error(1)
+}
+
+func TestCreateLeague(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockLeagueRepository)
+	service := NewLeagueService(mockRepo)
+
+	userID := uuid.New().String()
+	leagueInfo := &espn.LeagueInfo{
+		ID:     "123456",
+		Name:   "Test League",
+		Season: 2024,
+		Settings: espn.LeagueSettings{
+			ScoringSettings: espn.ScoringSettings{
+				ReceptionPoints: 1.0, // PPR
+			},
+			RosterSettings: espn.RosterSettings{
+				QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, DST: 1, K: 1, BENCH: 6,
+			},
+			PlayoffSettings: espn.PlayoffSettings{
+				PlayoffTeams: 6,
+				PlayoffStart: 15,
+			},
+		},
+		Status: espn.LeagueStatus{
+			CurrentWeek:        10,
+			FinalMatchupPeriod: 17,
+			IsActive:           true,
+		},
+		Teams: []espn.Team{
+			{ID: 1, Name: "Team 1"},
+			{ID: 2, Name: "Team 2"},
+		},
+	}
+
+	// Test successful creation
+	mockRepo.On("GetByExternalID", ctx, leagueInfo.ID, userID).Return(nil, nil)
+	mockRepo.On("Create", ctx, mock.AnythingOfType("*models.League")).Return(nil)
+
+	league, err := service.CreateLeague(ctx, userID, leagueInfo, "ESPN")
+	assert.NoError(t, err)
+	assert.NotNil(t, league)
+	assert.Equal(t, "ESPN", league.Platform)
+	assert.Equal(t, "123456", league.ExternalID)
+	assert.Equal(t, "Test League", league.Name)
+	assert.Equal(t, "PPR", league.Settings.ScoringType)
+
+	// Test league already exists
+	existingLeague := &models.League{ID: uuid.New().String()}
+	mockRepo.On("GetByExternalID", ctx, "existing", userID).Return(existingLeague, nil)
+
+	_, err = service.CreateLeague(ctx, userID, &espn.LeagueInfo{ID: "existing"}, "ESPN")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "already connected")
+}
+
+func TestDetectScoringFormat(t *testing.T) {
+	service := &LeagueService{}
+
+	// Test PPR
+	pprSettings := espn.LeagueSettings{
+		ScoringSettings: espn.ScoringSettings{
+			ReceptionPoints: 1.0,
+		},
+	}
+	assert.Equal(t, "PPR", service.detectScoringFormat(pprSettings))
+
+	// Test Half PPR
+	halfPPRSettings := espn.LeagueSettings{
+		ScoringSettings: espn.ScoringSettings{
+			ReceptionPoints: 0.5,
+		},
+	}
+	assert.Equal(t, "HALF_PPR", service.detectScoringFormat(halfPPRSettings))
+
+	// Test Standard
+	standardSettings := espn.LeagueSettings{
+		ScoringSettings: espn.ScoringSettings{
+			ReceptionPoints: 0.0,
+		},
+	}
+	assert.Equal(t, "STANDARD", service.detectScoringFormat(standardSettings))
+}
+
+func TestGetLeague(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockLeagueRepository)
+	service := NewLeagueService(mockRepo)
+
+	leagueID := uuid.New().String()
+	userID := uuid.New().String()
+
+	// Test successful retrieval
+	expectedLeague := &models.League{
+		ID:     leagueID,
+		UserID: userID,
+		Name:   "Test League",
+	}
+	mockRepo.On("GetByID", ctx, leagueID).Return(expectedLeague, nil)
+
+	league, err := service.GetLeague(ctx, leagueID, userID)
+	assert.NoError(t, err)
+	assert.NotNil(t, league)
+	assert.Equal(t, expectedLeague.Name, league.Name)
+
+	// Test unauthorized access
+	otherUserLeague := &models.League{
+		ID:     leagueID,
+		UserID: "different-user",
+		Name:   "Other League",
+	}
+	mockRepo.On("GetByID", ctx, "other-league").Return(otherUserLeague, nil)
+
+	_, err = service.GetLeague(ctx, "other-league", userID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unauthorized")
+}
+
+func TestUpdateLeague(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockLeagueRepository)
+	service := NewLeagueService(mockRepo)
+
+	leagueID := uuid.New().String()
+	existingLeague := &models.League{
+		ID:         leagueID,
+		ExternalID: "123456",
+		Settings: models.LeagueSettings{
+			CurrentWeek: 10,
+		},
+		IsActive: true,
+	}
+
+	leagueInfo := &espn.LeagueInfo{
+		ID: "123456",
+		Status: espn.LeagueStatus{
+			CurrentWeek: 11,
+			IsActive:    false,
+		},
+		Teams: []espn.Team{
+			{ID: 1, Name: "Updated Team 1"},
+		},
+	}
+
+	mockRepo.On("GetByID", ctx, leagueID).Return(existingLeague, nil)
+	mockRepo.On("Update", ctx, mock.AnythingOfType("*models.League")).Return(nil)
+
+	updated, err := service.UpdateLeague(ctx, leagueID, leagueInfo)
+	assert.NoError(t, err)
+	assert.NotNil(t, updated)
+	assert.Equal(t, 11, updated.Settings.CurrentWeek)
+	assert.False(t, updated.IsActive)
+
+	// Verify teams data was updated
+	var teams []espn.Team
+	err = json.Unmarshal([]byte(updated.TeamsData), &teams)
+	assert.NoError(t, err)
+	assert.Len(t, teams, 1)
+	assert.Equal(t, "Updated Team 1", teams[0].Name)
+}
+
+func TestDeleteLeague(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockLeagueRepository)
+	service := NewLeagueService(mockRepo)
+
+	leagueID := uuid.New().String()
+	userID := uuid.New().String()
+
+	// Test successful deletion
+	league := &models.League{
+		ID:     leagueID,
+		UserID: userID,
+	}
+	mockRepo.On("GetByID", ctx, leagueID).Return(league, nil)
+	mockRepo.On("Delete", ctx, leagueID).Return(nil)
+
+	err := service.DeleteLeague(ctx, leagueID, userID)
+	assert.NoError(t, err)
+
+	// Test unauthorized deletion
+	otherUserLeague := &models.League{
+		ID:     "other-league",
+		UserID: "different-user",
+	}
+	mockRepo.On("GetByID", ctx, "other-league").Return(otherUserLeague, nil)
+
+	err = service.DeleteLeague(ctx, "other-league", userID)
+	assert.Error(t, err)
+}
+
+func TestSyncAllLeagues(t *testing.T) {
+	ctx := context.Background()
+	mockRepo := new(MockLeagueRepository)
+	service := NewLeagueService(mockRepo)
+	espnClient := espn.NewESPNClient()
+
+	// Mock active leagues
+	activeLeagues := []*models.League{
+		{
+			ID:         uuid.New().String(),
+			ExternalID: "league1",
+			IsActive:   true,
+			LastSyncAt: time.Now().Add(-2 * time.Hour),
+		},
+		{
+			ID:         uuid.New().String(),
+			ExternalID: "league2",
+			IsActive:   true,
+			LastSyncAt: time.Now().Add(-3 * time.Hour),
+		},
+	}
+
+	mockRepo.On("GetActiveLeagues", ctx).Return(activeLeagues, nil)
+
+	// Note: In a real test, we'd mock the ESPN client too
+	// For now, this will fail on actual ESPN calls but demonstrates the structure
+	err := service.SyncAllLeagues(ctx, espnClient)
+	assert.NoError(t, err)
+
+	mockRepo.AssertExpectations(t)
+}

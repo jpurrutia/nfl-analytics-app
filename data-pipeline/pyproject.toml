@@ -1,0 +1,66 @@
+[project]
+name = "nfl-data-pipeline"
+version = "0.1.0"
+description = "NFL analytics data pipeline"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.1.4",
+    "numpy>=1.26.2",
+    "scipy>=1.11.4",
+    "duckdb>=0.9.2",
+    "requests>=2.31.0",
+    "python-dotenv>=1.0.0",
+    "nfl-data-py>=0.3.1",
+    "beautifulsoup4>=4.12.2",
+    "lxml>=4.9.4",
+    "psycopg2-binary>=2.9.9",
+    "sqlalchemy>=2.0.23",
+    "pyarrow>=14.0.2",
+    "tqdm>=4.66.1",
+    "schedule>=1.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "black>=23.12.0",
+    "ruff>=0.1.8",
+    "mypy>=1.7.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["analytics", "database", "extractors", "transformers", "orchestration", "models"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["analytics", "extractors", "transformers", "database", "orchestration"]
+omit = ["tests/*", "*/test_*.py"]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N"]
+ignore = ["E501"]  # Line too long - handled by black
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
